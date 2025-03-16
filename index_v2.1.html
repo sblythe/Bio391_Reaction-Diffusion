@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reaction-Diffusion Pattern Simulator</title>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            /* height: 100vh; */
+            margin: 0;
+            padding: 20 px;
+            text-align: center;
+        }
+        .container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20 px;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            margin-left: 20px;
+        }
+        .slider-container, .dt-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin: 5px 0;
+        }
+        input[type="range"] { width: 150px; }
+        canvas { border: 1px solid black; }
+        .dt-button { margin: 2px; padding: 5px; cursor: pointer; }
+        progress { width: 100%; height: 20px; }
+        .math-section {
+            max-width: 800px;
+            margin-top: 40px;
+            text-align: left;
+        }
+    </style>
+</head>
+<body>
+    <h1> Reaction-Diffusion Pattern Simulator </h1>
+    <div class="container">
+        <canvas id="canvas"></canvas>
+
+        <div class="controls">
+            <button id="startButton">Start</button>
+            <button id="stopButton">Stop</button>
+            <button id="resetButton">Reset</button>
+
+            <br>
+
+            <progress id="progressBar" value="0" max="100"></progress>
+
+            <br>
+
+            <div class="slider-container">
+                <label for="duSlider">Du:</label>
+                <input type="range" id="duSlider" min="0.001" max="1.0" step="0.001" value="0.65">
+                <span id="duValue">0.65</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="dvSlider">Dv:</label>
+                <input type="range" id="dvSlider" min="0.001" max="1.0" step="0.001" value="0.25">
+                <span id="dvValue">0.25</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="fSlider">F:</label>
+                <input type="range" id="fSlider" min="0.001" max="0.1" step="0.001" value="0.01">
+                <span id="fValue">0.01</span>
+            </div>
+
+            <div class="slider-container">
+                <label for="kSlider">k:</label>
+                <input type="range" id="kSlider" min="0.001" max="0.1" step="0.001" value="0.045">
+                <span id="kValue">0.045</span>
+            </div>
+
+            <div class="dt-container">
+                <label>dt:</label>
+                <button class="dt-button" data-dt="0.1">0.1</button>
+                <button class="dt-button" data-dt="0.25">0.25</button>
+                <button class="dt-button" data-dt="0.5">0.5</button>
+                <button class="dt-button" data-dt="1">1</button>
+                <span id="dtValue">1.0</span>
+            </div>
+
+        </div>
+    </div>
+    
+    <div class="math-section">
+        <h2>Purpose</h2>
+        <p>
+            Reaction-diffusion systems are well-studied in the fields of mathematics, physics, chemistry, and biology. This is not intended to be an authoritative treatment of the topic, but rather a simulator that allows users to explore the effect of different parameters towards the end result of pattern formation, for the purpose of building intuition for how these systems work. For some really in-depth discussion of the effects of parameter choices on pattern formation, as well as a decidedly superior simulator (but with less access to parameter variants), please see <a href="https://mrob.com/pub/comp/xmorphia/pearson-classes.html"> this</a> site with classifications of different model outputs, as well as <a href="https://mrob.com/pub/comp/xmorphia/ogl/index.html">this</a> simulator from Robert Munafo.
+        </p>
+        <h2>Mathematical Model</h2>
+        <p>
+            The simulation is based on the reaction-diffusion system introduced by Alan Turing. It describes two interacting chemical species \( U \) and \( V \), diffusing and reacting according to:
+        </p>
+        
+        <p>
+            \[
+            \frac{\partial U}{\partial t} = D_u \nabla^2 U - UV^2 + F(1 - U)
+            \]
+        </p>
+        
+        <p>
+            \[
+            \frac{\partial V}{\partial t} = D_v \nabla^2 V + UV^2 - (F + k)V
+            \]
+        </p>
+
+        <h3>Key Terms</h3>
+        <ul>
+            <li>\( D_u, D_v \) : Diffusion rates of the chemicals \( U \) and \( V \).</li>
+            <li>\( F \) : Synthesis (feed) rate: how much \( U \) is added to the system.</li>
+            <li>\( k \) : Degradation (kill) rate: how much \( V \) is removed from the system.</li>
+            <li>\( \nabla^2 \) : The Laplacian operator, which models diffusion for either U or V.</li>
+        </ul>
+        <h3>Reaction Conditions</h3>
+        <p>
+            The "activator" \(U\) does two things:
+            <ul>
+                <li>\(U\) self-sustains. It is constantly fed into the system at rate \(F\).</li>
+                <li>It promotes the production of the inhibitor, \(V\).</li>
+            </ul>
+            The "inhibitor" \(V\) does two things:
+            <ul>
+                <li>\(V\) suppresses the activator by consuming it. This is accomplished by the \(UV^2\) term in the reaction equations.</li>
+                <li>The inhibitor decays from the system at a rate of \(k\).</li>
+            </ul>
+        </p>
+
+        <p>
+            For each time step \(dt\), at each position in the grid (\(i ,j\)), the concentrations of \(U\) and \(V\) are calculated according to the chosen parameters through the equations above. The colormap for this simulation is grayscale, corresponding to low \(U\) = black, high \(U\) = white. 
+        </p>
+        <p>
+            The initial state is a field of random values for \(U\) and \(V\), with a central enrichment for \(V\) > \(U\).
+        </p>
+
+        <h3>Numerical Approximation</h3>
+        <p>
+            The Laplacian \( \nabla^2 \) for \(U\) and \(V\) is approximated using a 9-point stencil that models for a central position (\(i,j\)) at time <i>n</i>, the redistribution of \(U\) or \(V\) due to diffusion at time <i>n + 1</i>:
+        </p>
+        
+        <p>
+        \[    
+        \nabla^2 U_{i,j} \approx \frac{1}{\Delta x^2} \left[ 0.2 \left( U_{i+1,j} + U_{i-1,j} + U_{i,j+1} + U_{i,j-1} \right) + 0.05 \left( U_{i+1,j+1} + U_{i+1,j-1} + U_{i-1,j+1} + U_{i-1,j-1} \right) - 1.0 U_{i,j} \right]
+        \]
+
+        </p>
+
+        <p>The system is evolved using the Euler method with a time step \( \Delta t \).</p>
+
+        <h3>Pattern Formation</h3>
+        <p>
+            By adjusting \( D_u, D_v, F, k \), we can generate stripe, spot, or labyrinth patterns. These emerge when the diffusion and reaction terms compete to create instability.
+        </p>
+
+        <h2>Some Example Parameters</h2>
+        <p>
+            Note, this script is not optimized to be amazing. There are conditions that will cause the simulation to freak out. Freak outs include a rapidly-expanding black diamond, as well as stuff that looks like a pulsating checkerboard pattern. If this happens, reset the simulation (reload the page) and try a different set of parameters.
+        </p>
+         <p>
+            It is a well known feature of reaction-diffusion models that the acceptable parameter space for forming 'neat' patterns is limited. Small changes in \(F\) or \(k\) can yield major changes in patterns given a fixed \(D_u\) and \(D_v\). What follows is an example exploration of this parameter space, given the initial default conditions. We will hold the diffusion (\(D_u, D_v\)) parameters constant, and just introduce adjustments to \(F\) and \(k\) to see how that affects the system. Users can do this, but it is also suggested that users explore different diffusion constants and try to find similar (or unique) behaviors.
+        </p>
+        <p>
+            The simulation defaults to conditions that yield unstable waves of V, initiating with an expanding ring that degrades to wavelets when it hits the boundary of the simulation. (\(D_u\): 0.650, \(D_v\): 0.250, \(F\): 0.010, \(k\): 0.045).
+        </p>
+         <p>
+            Next, if you add five to each of the parameters \(F\) and \(k\) (0.015, 0.050), then this generates a pulsating collection of beans. This is still an 'unstable' pattern.
+        </p>
+        <p>
+            If you next adjust \(F\) to 0.020, then we begin to get more stable, 'lined' patterns.
+        </p>
+        <p>
+            However, further adjustment of \(F\) to 0.025 results in a highly unstable pulsating pattern.
+        </p>
+        <p>
+            Next, adjusting \(k\) to 0.055 yields a slow-developing 'labyrinth' pattern.
+        </p>
+        <p>
+            Subsequently, adjusting \(F\) to 0.030 yields a set of concentric rings that compress into mostly concentric squares with a few break-throughs. 
+        </p>
+        <p>
+            Adjusting \(k\) to 0.060 now gives a new pattern, a mixture of dots and worms that appear stable on short timescales, but are probably oscillating between fusion and fission over longer timescales.
+        </p>
+        <p>
+            ((And so on and so forth))... The point is, one way to informally explore this patterning system is to find an operable set of diffusion constants, and to increment between small changes to \(F\) or \(k\) to yield different patterning outputs.
+        </p>
+        <p>
+            We begin to get dot patterns with (\(F, k\)) of (0.035, 0.065). Upping the \(k\) parameter to 0.070 will yield a slow developing "cell division" pattern. 
+        </p>
+
+
+    </div>
+    <footer>
+        Author: <strong>Shelby Blythe</strong> Northwestern University, March 2025.
+    </footer>
+
+    <script src="turing_pattern_v2.js"></script>
+
+</body>
+</html>
